@@ -31,6 +31,14 @@ export function toFoodItem(i: MenuItem) {
   };
 }
 
+// The website reads `company.vat` to add VAT at checkout. The rate comes from
+// the dashboard Settings page (same value Manual Orders use); `excluded` is
+// true when WEBSITE is in that page's "VAT excluded sources" list.
+export function toCompanyVat(percent: number, excluded: boolean) {
+  const percentage = Number(percent) || 0;
+  return { percentage, applicable: percentage > 0 && !excluded };
+}
+
 export function toBranch(b: Branch, companyId: string) {
   return {
     // Branches without an external_id cannot be matched by the ingest
