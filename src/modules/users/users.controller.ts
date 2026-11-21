@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -55,6 +56,14 @@ export class UsersController {
     @CurrentUser() requester: JwtPayload,
   ) {
     return this.usersService.update(id, dto, requester);
+  }
+
+  @Audit('USER_DELETE', 'user')
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.ADMIN)
+  remove(@Param('id') id: string, @CurrentUser() requester: JwtPayload) {
+    return this.usersService.remove(id, requester);
   }
 
   @Audit('USER_PASSWORD_RESET', 'user')

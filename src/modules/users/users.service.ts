@@ -143,6 +143,33 @@ export class UsersService {
     await this.authService.revokeAllSessions(id);
   }
 
+  // Hard delete, only for users with no recorded activity (e.g. an account made
+  // by mistake). Anyone who has handled orders or appears in the audit log keeps
+  // their record, so they must be blocked instead of deleted.
+  async remove(id: string, requester: JwtPayload): Promise<{ message: string }> {
+    if (id === requester.sub) {
+      throw new ForbiddenException('Cannot delete your own account');
+    }
+
+    const user = await this.repo.findByIdForWrite(id);
+    if (!user) throw new NotFoundException('User not found');
+
+    if (!canManageRole(requester.role, user.role)) {
+      throw new ForbiddenException('Cannot delete a user with a role equal to or above your own');
+    }
+
+    if (await this.repo.hasActivity(id)) {
+      throw new ConflictException(
+        'This user has order or audit history, so it cannot be deleted. Block the user instead.',
+      );
+    }
+
+    await this.authService.revokeAllSessions(id);
+    await this.devicesService.unregister(id);
+    await this.repo.remove(user);
+    return { message: 'User deleted' };
+  }
+
   async getLoginActivity(userId: string, limit: number): Promise<LoginAudit[]> {
     const user = await this.repo.findById(userId);
     if (!user) throw new NotFoundException('User not found');

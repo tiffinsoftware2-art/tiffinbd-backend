@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AuditLog } from '../audit/entities/audit-log.entity';
 import { User } from '../auth/entities/user.entity';
+import { OrderCompletion } from '../orders/entities/order-completion.entity';
+import { OrderDeleteRequest } from '../orders/entities/order-delete-request.entity';
+import { Order } from '../orders/entities/order.entity';
 
 const SAFE_FIELDS: (keyof User)[] = [
   'id', 'name', 'username', 'role', 'branch_id',
@@ -43,5 +47,25 @@ export class UsersRepository {
 
   async saveExisting(user: User): Promise<User> {
     return this.repo.save(user);
+  }
+
+  // True if this user appears as the actor on any order, completion, delete
+  // request or audit-log row. Those tables keep only the user's id (no foreign
+  // key), so deleting the user would silently orphan the "who did this" trail.
+  async hasActivity(id: string): Promise<boolean> {
+    const m = this.repo.manager;
+    const found = await Promise.all([
+      m.exists(Order, {
+        where: [{ createdBy: id }, { acceptedBy: id }, { settledBy: id }, { archivedBy: id }],
+      }),
+      m.exists(OrderCompletion, { where: { completedBy: id } }),
+      m.exists(OrderDeleteRequest, { where: [{ requestedBy: id }, { reviewedBy: id }] }),
+      m.exists(AuditLog, { where: { actor_user_id: id } }),
+    ]);
+    return found.some(Boolean);
+  }
+
+  async remove(user: User): Promise<void> {
+    await this.repo.remove(user);
   }
 }
