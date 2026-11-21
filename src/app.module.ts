@@ -31,6 +31,8 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { EventsModule } from './modules/events/events.module';
 import { IngestModule } from './modules/ingest/ingest.module';
 import { MenuModule } from './modules/menu/menu.module';
+import { PlatformMenuItem } from './modules/platform-menu/entities/platform-menu-item.entity';
+import { PlatformMenuModule } from './modules/platform-menu/platform-menu.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { UsersModule } from './modules/users/users.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
@@ -68,6 +70,7 @@ import { ReportsModule } from './modules/reports/reports.module';
           EscalationConfig,
           ManualOrderConfig,
           AuditLog,
+          PlatformMenuItem,
         ],
         // Always off — including local/test. Schema changes must go through
         // committed migrations (see ADR-008) so drift shows up in dev, not
@@ -82,6 +85,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     BranchesModule,
     IngestModule,
     MenuModule,
+    PlatformMenuModule,
     OrdersModule,
     UsersModule,
     DevicesModule,
