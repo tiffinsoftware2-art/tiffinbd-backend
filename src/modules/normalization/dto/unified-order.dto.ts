@@ -10,6 +10,7 @@ export enum OrderSource {
   WHATSAPP = 'WHATSAPP',
   PHONE = 'PHONE',
   OTHER = 'OTHER',
+  PHYSICAL_STORE = 'PHYSICAL_STORE',
 }
 
 // Sources eligible for Manual Order Entry.
@@ -21,6 +22,7 @@ export const MANUAL_ORDER_SOURCES = [
   OrderSource.WEBSITE,
   OrderSource.FOODIE,
   OrderSource.OTHER,
+  OrderSource.PHYSICAL_STORE,
 ] as const;
 
 export enum OrderType {

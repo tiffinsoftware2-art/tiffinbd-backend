@@ -4,6 +4,7 @@ const PLATFORM_LABEL: Record<string, string> = {
   FOODPANDA: 'Foodpanda',
   PATHAO: 'Pathao',
   FOODIE: 'Foodi',
+  PHYSICAL_STORE: 'Physical Store',
 };
 
 // Delivery platforms (Foodpanda, Pathao, Foodi) hold the customer's details
