@@ -20,6 +20,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import type { JwtPayload } from '../auth/auth.service';
 import { CreateManualOrderDto } from './dto/create-manual-order.dto';
 import { UpdateManualOrderDto } from './dto/update-manual-order.dto';
+import { UpdatePaymentStatusDto } from './dto/update-payment-status.dto';
 import { OrderExportFilterDto, OrderFilterDto } from './dto/order-filter.dto';
 import { SettleOrderDto } from './dto/settle-order.dto';
 import {
@@ -95,6 +96,15 @@ export class OrdersController {
     @CurrentUser() actor: JwtPayload,
   ) {
     return this.ordersService.updateManualOrder(id, dto, actor);
+  }
+
+  // Admin+ — mark an order Paid or Due (used from the Customers page).
+  @Audit('ORDER_PAYMENT_UPDATE', 'order')
+  @Patch(':id/payment')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  updatePayment(@Param('id') id: string, @Body() dto: UpdatePaymentStatusDto) {
+    return this.ordersService.updatePaymentStatus(id, dto.paymentStatus);
   }
 
   @Audit('ORDER_ACCEPT', 'order')

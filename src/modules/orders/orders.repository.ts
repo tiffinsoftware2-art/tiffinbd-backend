@@ -10,6 +10,7 @@ import {
   DiscountType,
   Order,
   OrderStatus,
+  PaymentStatus,
 } from './entities/order.entity';
 import { OrderHistory } from './entities/order-history.entity';
 import {
@@ -94,6 +95,7 @@ export class OrdersRepository {
     branchId: string | null,
     pricing?: ManualOrderPricing,
     createdBy: string | null = null,
+    paymentStatus: PaymentStatus = PaymentStatus.PAID,
   ): Promise<Order> {
     const totalAmount =
       pricing?.totalAmount ??
@@ -118,6 +120,7 @@ export class OrdersRepository {
       productSubtotal,
       rawPayload: unified.rawPayload,
       createdBy,
+      paymentStatus,
       acceptedBy: null,
       acceptedAt: null,
       escalatedAt: null,
@@ -162,6 +165,11 @@ export class OrdersRepository {
     );
     await this.enrichBranches([saved]);
     return saved;
+  }
+
+  async setPaymentStatus(order: Order, status: PaymentStatus): Promise<Order> {
+    order.paymentStatus = status;
+    return this.orderRepo.save(order);
   }
 
   async accept(order: Order, userId: string): Promise<Order> {
@@ -690,6 +698,7 @@ export class OrdersRepository {
     order.orderType = dto.orderType;
     order.customer = resolveManualCustomer(dto);
     order.items = dto.items;
+    if (dto.paymentStatus) order.paymentStatus = dto.paymentStatus;
     order.productSubtotal = pricing.productSubtotal;
     order.vatPercent = pricing.vatPercent;
     order.vatAmount = pricing.vatAmount;

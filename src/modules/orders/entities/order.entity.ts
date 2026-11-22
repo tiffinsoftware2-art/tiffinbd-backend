@@ -21,6 +21,12 @@ export enum OrderStatus {
   ESCALATED = 'ESCALATED',
 }
 
+// Paid in full, or still owed (Due). Existing and website orders are PAID.
+export enum PaymentStatus {
+  PAID = 'PAID',
+  DUE = 'DUE',
+}
+
 // Manual orders only — see ADR-005 and manual-order.md.
 export enum DiscountType {
   PERCENTAGE = 'percentage',
@@ -99,6 +105,9 @@ export class Order {
   // order-update.md / ADR-006. Always false for orders that have never been edited.
   @Column({ type: 'boolean', default: false })
   isUpdated: boolean;
+
+  @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PAID })
+  paymentStatus: PaymentStatus;
 
   // ── Order Delete — soft-archive (null = active/not archived) — see order-delete.md / ADR-007 ──
   @Column({ type: 'datetime', precision: 3, nullable: true, default: null })

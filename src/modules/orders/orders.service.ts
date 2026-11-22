@@ -23,7 +23,12 @@ import type {
   CreateDeleteRequestDto,
   RejectDeleteRequestDto,
 } from './dto/order-delete.dto';
-import { DiscountType, Order, OrderStatus } from './entities/order.entity';
+import {
+  DiscountType,
+  Order,
+  OrderStatus,
+  PaymentStatus,
+} from './entities/order.entity';
 import type { OrderHistory } from './entities/order-history.entity';
 import type { OrderEditHistory } from './entities/order-edit-history.entity';
 import {
@@ -285,6 +290,7 @@ export class OrdersService {
         totalAmount,
       },
       actor.sub,
+      dto.paymentStatus ?? PaymentStatus.PAID,
     );
     await this.repo.enrichCreators([order]);
     this.emitOrderCreated(order);
@@ -429,6 +435,7 @@ export class OrdersService {
       discountType: order.discountType ?? null,
       discountValue: toNumberOrNull(order.discountValue),
       discountAmount: toNumberOrNull(order.discountAmount),
+      paymentStatus: order.paymentStatus,
       createdBy: order.createdBy ?? null,
       createdByName: order.createdByName ?? null,
       acceptedBy: null,
@@ -451,6 +458,13 @@ export class OrdersService {
       totalAmount: Number(order.totalAmount),
       createdAt: order.createdAt.toISOString(),
     });
+  }
+
+  // Admin+ — records whether an order is paid or still due.
+  async updatePaymentStatus(id: string, status: PaymentStatus): Promise<Order> {
+    const order = await this.repo.findById(id);
+    if (!order) throw new NotFoundException('Order not found');
+    return this.repo.setPaymentStatus(order, status);
   }
 
   async acceptOrder(id: string, actor: JwtPayload): Promise<Order> {

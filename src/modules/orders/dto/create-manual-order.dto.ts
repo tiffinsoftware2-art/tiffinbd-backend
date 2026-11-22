@@ -18,6 +18,7 @@ import {
   OrderType,
 } from '../../normalization/dto/unified-order.dto';
 import { isCustomerOptional } from '../manual-customer.util';
+import { PaymentStatus } from '../entities/order.entity';
 
 export class ManualOrderItemDto {
   @IsString()
@@ -61,6 +62,10 @@ export class CreateManualOrderDto {
   @IsString()
   @IsNotEmpty()
   customerAddress: string;
+
+  @IsOptional()
+  @IsIn(Object.values(PaymentStatus))
+  paymentStatus?: PaymentStatus;
 
   @IsOptional()
   @IsString()

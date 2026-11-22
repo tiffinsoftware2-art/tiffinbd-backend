@@ -33,6 +33,7 @@ import { IngestModule } from './modules/ingest/ingest.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { PlatformMenuItem } from './modules/platform-menu/entities/platform-menu-item.entity';
 import { PlatformMenuModule } from './modules/platform-menu/platform-menu.module';
+import { CustomersModule } from './modules/customers/customers.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { UsersModule } from './modules/users/users.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
@@ -86,6 +87,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     IngestModule,
     MenuModule,
     PlatformMenuModule,
+    CustomersModule,
     OrdersModule,
     UsersModule,
     DevicesModule,
