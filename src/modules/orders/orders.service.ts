@@ -27,6 +27,7 @@ import {
   DiscountType,
   Order,
   OrderStatus,
+  PaymentMethod,
   PaymentStatus,
 } from './entities/order.entity';
 import type { OrderHistory } from './entities/order-history.entity';
@@ -291,6 +292,7 @@ export class OrdersService {
       },
       actor.sub,
       dto.paymentStatus ?? PaymentStatus.PAID,
+      dto.paymentMethod ?? null,
     );
     await this.repo.enrichCreators([order]);
     this.emitOrderCreated(order);
@@ -436,6 +438,7 @@ export class OrdersService {
       discountValue: toNumberOrNull(order.discountValue),
       discountAmount: toNumberOrNull(order.discountAmount),
       paymentStatus: order.paymentStatus,
+      paymentMethod: order.paymentMethod ?? null,
       createdBy: order.createdBy ?? null,
       createdByName: order.createdByName ?? null,
       acceptedBy: null,
@@ -461,10 +464,14 @@ export class OrdersService {
   }
 
   // Admin+ — records whether an order is paid or still due.
-  async updatePaymentStatus(id: string, status: PaymentStatus): Promise<Order> {
+  async updatePaymentStatus(
+    id: string,
+    status: PaymentStatus,
+    method?: PaymentMethod,
+  ): Promise<Order> {
     const order = await this.repo.findById(id);
     if (!order) throw new NotFoundException('Order not found');
-    return this.repo.setPaymentStatus(order, status);
+    return this.repo.setPaymentStatus(order, status, method);
   }
 
   async acceptOrder(id: string, actor: JwtPayload): Promise<Order> {

@@ -109,6 +109,7 @@ export class CustomersService {
       createdAt: o.createdAt.toISOString(),
       totalAmount: Number(o.totalAmount),
       paymentStatus: o.paymentStatus,
+      paymentMethod: o.paymentMethod,
     }));
   }
 }

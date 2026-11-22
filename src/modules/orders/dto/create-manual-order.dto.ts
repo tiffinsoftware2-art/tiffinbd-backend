@@ -18,7 +18,7 @@ import {
   OrderType,
 } from '../../normalization/dto/unified-order.dto';
 import { isCustomerOptional } from '../manual-customer.util';
-import { PaymentStatus } from '../entities/order.entity';
+import { PaymentMethod, PaymentStatus } from '../entities/order.entity';
 
 export class ManualOrderItemDto {
   @IsString()
@@ -66,6 +66,11 @@ export class CreateManualOrderDto {
   @IsOptional()
   @IsIn(Object.values(PaymentStatus))
   paymentStatus?: PaymentStatus;
+
+  // Only kept for Paid orders; a Due order has no method yet.
+  @IsOptional()
+  @IsIn(Object.values(PaymentMethod))
+  paymentMethod?: PaymentMethod;
 
   @IsOptional()
   @IsString()

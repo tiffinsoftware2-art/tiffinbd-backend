@@ -104,7 +104,11 @@ export class OrdersController {
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   updatePayment(@Param('id') id: string, @Body() dto: UpdatePaymentStatusDto) {
-    return this.ordersService.updatePaymentStatus(id, dto.paymentStatus);
+    return this.ordersService.updatePaymentStatus(
+      id,
+      dto.paymentStatus,
+      dto.paymentMethod,
+    );
   }
 
   @Audit('ORDER_ACCEPT', 'order')

@@ -17,7 +17,7 @@ import {
   OrderType,
 } from '../../normalization/dto/unified-order.dto';
 import { isCustomerOptional } from '../manual-customer.util';
-import { PaymentStatus } from '../entities/order.entity';
+import { PaymentMethod, PaymentStatus } from '../entities/order.entity';
 import { ManualOrderItemDto } from './create-manual-order.dto';
 
 // branchId is intentionally not editable — an order's branch is fixed at
@@ -60,6 +60,11 @@ export class UpdateManualOrderDto {
   @IsOptional()
   @IsIn(Object.values(PaymentStatus))
   paymentStatus?: PaymentStatus;
+
+  // Only kept for Paid orders; a Due order has no method yet.
+  @IsOptional()
+  @IsIn(Object.values(PaymentMethod))
+  paymentMethod?: PaymentMethod;
 
   @IsOptional()
   @IsString()

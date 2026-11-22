@@ -27,6 +27,17 @@ export enum PaymentStatus {
   DUE = 'DUE',
 }
 
+// How a paid order was paid. Null for Due orders and for orders from before this existed.
+export enum PaymentMethod {
+  CASH = 'CASH',
+  BKASH = 'BKASH',
+  NAGAD = 'NAGAD',
+  ROCKET = 'ROCKET',
+  CARD = 'CARD',
+  BANK = 'BANK',
+  OTHER = 'OTHER',
+}
+
 // Manual orders only — see ADR-005 and manual-order.md.
 export enum DiscountType {
   PERCENTAGE = 'percentage',
@@ -108,6 +119,9 @@ export class Order {
 
   @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PAID })
   paymentStatus: PaymentStatus;
+
+  @Column({ type: 'enum', enum: PaymentMethod, nullable: true, default: null })
+  paymentMethod: PaymentMethod | null;
 
   // ── Order Delete — soft-archive (null = active/not archived) — see order-delete.md / ADR-007 ──
   @Column({ type: 'datetime', precision: 3, nullable: true, default: null })

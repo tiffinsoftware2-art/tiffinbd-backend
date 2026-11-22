@@ -10,6 +10,7 @@ import {
   DiscountType,
   Order,
   OrderStatus,
+  PaymentMethod,
   PaymentStatus,
 } from './entities/order.entity';
 import { OrderHistory } from './entities/order-history.entity';
@@ -96,6 +97,7 @@ export class OrdersRepository {
     pricing?: ManualOrderPricing,
     createdBy: string | null = null,
     paymentStatus: PaymentStatus = PaymentStatus.PAID,
+    paymentMethod: PaymentMethod | null = null,
   ): Promise<Order> {
     const totalAmount =
       pricing?.totalAmount ??
@@ -121,6 +123,7 @@ export class OrdersRepository {
       rawPayload: unified.rawPayload,
       createdBy,
       paymentStatus,
+      paymentMethod: paymentStatus === PaymentStatus.DUE ? null : paymentMethod,
       acceptedBy: null,
       acceptedAt: null,
       escalatedAt: null,
@@ -167,8 +170,14 @@ export class OrdersRepository {
     return saved;
   }
 
-  async setPaymentStatus(order: Order, status: PaymentStatus): Promise<Order> {
+  async setPaymentStatus(
+    order: Order,
+    status: PaymentStatus,
+    method?: PaymentMethod,
+  ): Promise<Order> {
     order.paymentStatus = status;
+    order.paymentMethod =
+      status === PaymentStatus.DUE ? null : (method ?? order.paymentMethod ?? null);
     return this.orderRepo.save(order);
   }
 
@@ -698,7 +707,11 @@ export class OrdersRepository {
     order.orderType = dto.orderType;
     order.customer = resolveManualCustomer(dto);
     order.items = dto.items;
-    if (dto.paymentStatus) order.paymentStatus = dto.paymentStatus;
+    if (dto.paymentStatus) {
+      order.paymentStatus = dto.paymentStatus;
+      order.paymentMethod =
+        dto.paymentStatus === PaymentStatus.DUE ? null : (dto.paymentMethod ?? order.paymentMethod ?? null);
+    }
     order.productSubtotal = pricing.productSubtotal;
     order.vatPercent = pricing.vatPercent;
     order.vatAmount = pricing.vatAmount;
