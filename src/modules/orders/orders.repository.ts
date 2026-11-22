@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { resolveManualCustomer } from './manual-customer.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
@@ -677,12 +678,7 @@ export class OrdersRepository {
 
     order.source = dto.source;
     order.orderType = dto.orderType;
-    order.customer = {
-      name: dto.customerName,
-      phone: dto.customerPhone,
-      address: dto.customerAddress,
-      notes: dto.notes,
-    };
+    order.customer = resolveManualCustomer(dto);
     order.items = dto.items;
     order.productSubtotal = pricing.productSubtotal;
     order.vatPercent = pricing.vatPercent;

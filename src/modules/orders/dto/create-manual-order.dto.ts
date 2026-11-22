@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -16,6 +17,7 @@ import {
   OrderSource,
   OrderType,
 } from '../../normalization/dto/unified-order.dto';
+import { isCustomerOptional } from '../manual-customer.util';
 
 export class ManualOrderItemDto {
   @IsString()
@@ -42,14 +44,20 @@ export class CreateManualOrderDto {
   @IsIn(Object.values(OrderType))
   orderType: OrderType;
 
+  // Not required for Foodpanda / Pathao / Foodi orders.
+  @ValidateIf((o: { source: unknown }) => !isCustomerOptional(o.source))
   @IsString()
   @IsNotEmpty()
   customerName: string;
 
+  // Not required for Foodpanda / Pathao / Foodi orders.
+  @ValidateIf((o: { source: unknown }) => !isCustomerOptional(o.source))
   @IsString()
   @IsNotEmpty()
   customerPhone: string;
 
+  // Not required for Foodpanda / Pathao / Foodi orders.
+  @ValidateIf((o: { source: unknown }) => !isCustomerOptional(o.source))
   @IsString()
   @IsNotEmpty()
   customerAddress: string;

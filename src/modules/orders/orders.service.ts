@@ -32,6 +32,7 @@ import {
 } from './entities/order-delete-request.entity';
 import { Branch } from '../branches/entities/branch.entity';
 import { EventsService } from '../events/events.service';
+import { resolveManualCustomer } from './manual-customer.util';
 import { OrdersGateway } from './orders.gateway';
 import { OrdersRepository } from './orders.repository';
 import { MailService } from '../settings/mail.service';
@@ -265,12 +266,7 @@ export class OrdersService {
       items: dto.items,
       totalAmount,
       branchId,
-      customerInfo: {
-        name: dto.customerName,
-        phone: dto.customerPhone,
-        address: dto.customerAddress,
-        notes: dto.notes,
-      },
+      customerInfo: resolveManualCustomer(dto),
       rawPayload: {},
     };
 

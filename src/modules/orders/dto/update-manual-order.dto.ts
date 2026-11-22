@@ -9,12 +9,14 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import {
   OrderSource,
   OrderType,
 } from '../../normalization/dto/unified-order.dto';
+import { isCustomerOptional } from '../manual-customer.util';
 import { ManualOrderItemDto } from './create-manual-order.dto';
 
 // branchId is intentionally not editable — an order's branch is fixed at
@@ -36,14 +38,20 @@ export class UpdateManualOrderDto {
   @IsIn(Object.values(OrderType))
   orderType: OrderType;
 
+  // Not required for Foodpanda / Pathao / Foodi orders.
+  @ValidateIf((o: { source: unknown }) => !isCustomerOptional(o.source))
   @IsString()
   @IsNotEmpty()
   customerName: string;
 
+  // Not required for Foodpanda / Pathao / Foodi orders.
+  @ValidateIf((o: { source: unknown }) => !isCustomerOptional(o.source))
   @IsString()
   @IsNotEmpty()
   customerPhone: string;
 
+  // Not required for Foodpanda / Pathao / Foodi orders.
+  @ValidateIf((o: { source: unknown }) => !isCustomerOptional(o.source))
   @IsString()
   @IsNotEmpty()
   customerAddress: string;
