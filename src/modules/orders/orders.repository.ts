@@ -497,7 +497,17 @@ export class OrdersRepository {
     await this.enrichBranches(data);
     await this.enrichCompletion(data);
     await this.enrichPendingDeleteRequests(data);
+    await this.enrichCreators(data);
     return { data, total };
+  }
+
+  // Order History list — who created each order (the logged-in user who
+  // entered it). Website orders have no creator, so their name stays null.
+  async enrichCreators(orders: Order[]): Promise<void> {
+    const nameById = await this.resolveNames(orders.map((o) => o.createdBy));
+    for (const o of orders) {
+      o.createdByName = o.createdBy ? (nameById.get(o.createdBy) ?? null) : null;
+    }
   }
 
   // CSV export — same filters as findAll but unpaginated (every matching row

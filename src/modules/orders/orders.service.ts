@@ -286,6 +286,7 @@ export class OrdersService {
       },
       actor.sub,
     );
+    await this.repo.enrichCreators([order]);
     this.emitOrderCreated(order);
     return order;
   }
@@ -428,6 +429,8 @@ export class OrdersService {
       discountType: order.discountType ?? null,
       discountValue: toNumberOrNull(order.discountValue),
       discountAmount: toNumberOrNull(order.discountAmount),
+      createdBy: order.createdBy ?? null,
+      createdByName: order.createdByName ?? null,
       acceptedBy: null,
       acceptedAt: null,
       escalatedAt: null,
