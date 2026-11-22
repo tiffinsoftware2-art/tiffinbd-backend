@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { normalisePlatformOrderId } from './platform-order-id.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { In, Repository } from 'typeorm';
@@ -78,6 +79,7 @@ const EXPORT_COLUMNS: Array<{
     value: (o) => dhakaShifted(o.createdAt),
   },
   { header: 'Order ID', width: 16, value: (o) => o.externalId },
+  { header: 'Platform Order ID', width: 20, value: (o) => o.platformOrderId ?? '' },
   { header: 'Customer', width: 24, value: (o) => o.customer?.name ?? '' },
   { header: 'Platform', width: 13, value: (o) => o.source },
   { header: 'Branch', width: 18, value: (o) => o.branchName ?? '' },
@@ -263,6 +265,9 @@ export class OrdersService {
       platformFee -
       (discountAmount ?? 0);
 
+    const platformOrderId = normalisePlatformOrderId(dto.source, dto.platformOrderId);
+    if (platformOrderId) await this.assertPlatformOrderIdFree(dto.source, platformOrderId);
+
     const unified: UnifiedOrderDto = {
       // Short code, same convention as the website adapter's synthetic IDs
       // (tiffinbd.adapter.ts) — a full UUID was needlessly long for display.
@@ -293,6 +298,7 @@ export class OrdersService {
       actor.sub,
       dto.paymentStatus ?? PaymentStatus.PAID,
       dto.paymentMethod ?? null,
+      platformOrderId,
     );
     await this.repo.enrichCreators([order]);
     this.emitOrderCreated(order);
@@ -386,6 +392,11 @@ export class OrdersService {
       platformFee -
       (discountAmount ?? 0);
 
+    const platformOrderId = normalisePlatformOrderId(dto.source, dto.platformOrderId);
+    if (platformOrderId) {
+      await this.assertPlatformOrderIdFree(dto.source, platformOrderId, order.id);
+    }
+
     return this.repo.updateManual(
       order,
       dto,
@@ -439,6 +450,7 @@ export class OrdersService {
       discountAmount: toNumberOrNull(order.discountAmount),
       paymentStatus: order.paymentStatus,
       paymentMethod: order.paymentMethod ?? null,
+      platformOrderId: order.platformOrderId ?? null,
       createdBy: order.createdBy ?? null,
       createdByName: order.createdByName ?? null,
       acceptedBy: null,
@@ -461,6 +473,20 @@ export class OrdersService {
       totalAmount: Number(order.totalAmount),
       createdAt: order.createdAt.toISOString(),
     });
+  }
+
+  // The same platform order number must not be entered twice.
+  private async assertPlatformOrderIdFree(
+    source: string,
+    platformOrderId: string,
+    excludeId?: string,
+  ): Promise<void> {
+    const existing = await this.repo.findByPlatformOrderId(source, platformOrderId, excludeId);
+    if (existing) {
+      throw new ConflictException(
+        `${source} order ${platformOrderId} is already entered (order ${existing.externalId}).`,
+      );
+    }
   }
 
   // Admin+ — records whether an order is paid or still due.

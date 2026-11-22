@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { normalisePlatformOrderId } from './platform-order-id.util';
 import { resolveManualCustomer } from './manual-customer.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, Repository } from 'typeorm';
@@ -98,6 +99,7 @@ export class OrdersRepository {
     createdBy: string | null = null,
     paymentStatus: PaymentStatus = PaymentStatus.PAID,
     paymentMethod: PaymentMethod | null = null,
+    platformOrderId: string | null = null,
   ): Promise<Order> {
     const totalAmount =
       pricing?.totalAmount ??
@@ -124,6 +126,7 @@ export class OrdersRepository {
       createdBy,
       paymentStatus,
       paymentMethod: paymentStatus === PaymentStatus.DUE ? null : paymentMethod,
+      platformOrderId,
       acceptedBy: null,
       acceptedAt: null,
       escalatedAt: null,
@@ -168,6 +171,22 @@ export class OrdersRepository {
     );
     await this.enrichBranches([saved]);
     return saved;
+  }
+
+  // An active (not archived) order from this platform that already carries
+  // this platform order number. Used to stop the same order being entered twice.
+  async findByPlatformOrderId(
+    source: string,
+    platformOrderId: string,
+    excludeId?: string,
+  ): Promise<Order | null> {
+    const qb = this.orderRepo
+      .createQueryBuilder('o')
+      .where('o.source = :source', { source })
+      .andWhere('o.platformOrderId = :platformOrderId', { platformOrderId })
+      .andWhere('o.archivedAt IS NULL');
+    if (excludeId) qb.andWhere('o.id <> :excludeId', { excludeId });
+    return qb.getOne();
   }
 
   async setPaymentStatus(
@@ -495,6 +514,7 @@ export class OrdersRepository {
         new Brackets((sub) => {
           sub
             .where('o.externalId LIKE :q')
+            .orWhere('o.platformOrderId LIKE :q')
             .orWhere("JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.name')) LIKE :q")
             .orWhere(
               "JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.phone')) LIKE :q",
@@ -577,6 +597,7 @@ export class OrdersRepository {
         new Brackets((sub) => {
           sub
             .where('o.externalId LIKE :q')
+            .orWhere('o.platformOrderId LIKE :q')
             .orWhere("JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.name')) LIKE :q")
             .orWhere(
               "JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.phone')) LIKE :q",
@@ -707,6 +728,7 @@ export class OrdersRepository {
     order.orderType = dto.orderType;
     order.customer = resolveManualCustomer(dto);
     order.items = dto.items;
+    order.platformOrderId = normalisePlatformOrderId(dto.source, dto.platformOrderId);
     if (dto.paymentStatus) {
       order.paymentStatus = dto.paymentStatus;
       order.paymentMethod =

@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   ValidateIf,
   ValidateNested,
@@ -71,6 +72,12 @@ export class CreateManualOrderDto {
   @IsOptional()
   @IsIn(Object.values(PaymentMethod))
   paymentMethod?: PaymentMethod;
+
+  // Foodpanda / Pathao / Foodi order number; ignored for other sources.
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  platformOrderId?: string;
 
   @IsOptional()
   @IsString()

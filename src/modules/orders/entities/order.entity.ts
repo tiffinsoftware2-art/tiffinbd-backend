@@ -123,6 +123,11 @@ export class Order {
   @Column({ type: 'enum', enum: PaymentMethod, nullable: true, default: null })
   paymentMethod: PaymentMethod | null;
 
+  // Order number the delivery platform (Foodpanda / Pathao / Foodi) gave this
+  // order, typed in by staff. Null for every other source.
+  @Column({ type: 'varchar', length: 100, nullable: true, default: null })
+  platformOrderId: string | null;
+
   // ── Order Delete — soft-archive (null = active/not archived) — see order-delete.md / ADR-007 ──
   @Column({ type: 'datetime', precision: 3, nullable: true, default: null })
   archivedAt: Date | null;
