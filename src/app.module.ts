@@ -32,6 +32,7 @@ import { EventsModule } from './modules/events/events.module';
 import { IngestModule } from './modules/ingest/ingest.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { PlatformMenuItem } from './modules/platform-menu/entities/platform-menu-item.entity';
+import { MenuItemImage } from './modules/menu/entities/menu-item-image.entity';
 import { PlatformMenuModule } from './modules/platform-menu/platform-menu.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -72,6 +73,7 @@ import { ReportsModule } from './modules/reports/reports.module';
           ManualOrderConfig,
           AuditLog,
           PlatformMenuItem,
+          MenuItemImage,
         ],
         // Always off — including local/test. Schema changes must go through
         // committed migrations (see ADR-008) so drift shows up in dev, not

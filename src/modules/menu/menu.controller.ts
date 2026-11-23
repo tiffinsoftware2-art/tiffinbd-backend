@@ -1,9 +1,21 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { Audit } from '../audit/audit.decorator';
 import { CreateMenuCategoryDto, UpdateMenuCategoryDto } from './dto/menu-category.dto';
 import { CreateMenuItemDto, UpdateMenuItemDto } from './dto/menu-item.dto';
+import { MAX_MENU_IMAGE_BYTES } from './menu-image.util';
 import { MenuService } from './menu.service';
 
 @Controller('api/v1/menu')
@@ -55,6 +67,26 @@ export class MenuController {
   @Roles(UserRole.ADMIN)
   updateItem(@Param('id') id: string, @Body() dto: UpdateMenuItemDto) {
     return this.menuService.updateItem(id, dto);
+  }
+
+  // Upload a photo for the item (multipart field "file"). It replaces the
+  // item's image links on the website until it is removed.
+  @Audit('MENU_ITEM_IMAGE_UPLOAD', 'menu_item')
+  @Post('items/:id/image')
+  @Roles(UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_MENU_IMAGE_BYTES } }))
+  uploadImage(
+    @Param('id') id: string,
+    @UploadedFile() file: { buffer: Buffer; size: number } | undefined,
+  ) {
+    return this.menuService.setImage(id, file);
+  }
+
+  @Audit('MENU_ITEM_IMAGE_DELETE', 'menu_item')
+  @Delete('items/:id/image')
+  @Roles(UserRole.ADMIN)
+  deleteImage(@Param('id') id: string) {
+    return this.menuService.removeImage(id);
   }
 
   @Audit('MENU_ITEM_DELETE', 'menu_item')

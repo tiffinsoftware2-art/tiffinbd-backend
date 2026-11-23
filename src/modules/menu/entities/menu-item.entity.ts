@@ -51,6 +51,10 @@ export class MenuItem {
   @JoinColumn({ name: 'category_id' })
   category: MenuCategory | null;
 
+  // Virtual: set by MenuService when a photo was uploaded from the dashboard
+  // (milliseconds of its last change, used to bust caches). Not a column.
+  uploaded_image_version?: number | null;
+
   @CreateDateColumn()
   created_at: Date;
 

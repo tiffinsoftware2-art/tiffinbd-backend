@@ -14,7 +14,13 @@ export function toFoodCategory(c: MenuCategory) {
   return { _id: c.external_id, name: c.name, score: c.score };
 }
 
-export function toFoodItem(i: MenuItem) {
+// `imageBaseUrl` is this API's public address (e.g. https://api.example.com).
+// When a photo was uploaded for the item it replaces the image links.
+export function toFoodItem(i: MenuItem, imageBaseUrl?: string) {
+  const uploaded =
+    imageBaseUrl && i.uploaded_image_version
+      ? [`${imageBaseUrl}/api/v1/menu-images/${i.id}?v=${i.uploaded_image_version}`]
+      : null;
   return {
     _id: i.external_id,
     // An item with no category gets '' (the website treats it as uncategorised).
@@ -23,7 +29,7 @@ export function toFoodItem(i: MenuItem) {
     // MySQL decimals arrive as strings; the website does arithmetic on price.
     price: Number(i.price),
     selections: [], // item options are not modelled in the backend yet
-    images: i.images ?? [],
+    images: uploaded ?? i.images ?? [],
     scInclusive: i.sc_inclusive,
     vatInclusive: i.vat_inclusive,
     desc: i.description?.trim() || undefined,

@@ -19,6 +19,7 @@ import { EscalationConfig } from '../modules/settings/entities/escalation-config
 import { ManualOrderConfig } from '../modules/settings/entities/manual-order-config.entity';
 import { AuditLog } from '../modules/audit/entities/audit-log.entity';
 import { PlatformMenuItem } from '../modules/platform-menu/entities/platform-menu-item.entity';
+import { MenuItemImage } from '../modules/menu/entities/menu-item-image.entity';
 
 // Standalone DataSource for the TypeORM CLI (migration:generate/run/revert —
 // see ADR-008). NOT used by the running app — app.module.ts's
@@ -53,6 +54,7 @@ export const AppDataSource = new DataSource({
     ManualOrderConfig,
     AuditLog,
     PlatformMenuItem,
+    MenuItemImage,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   // Always false, even in development — this DataSource is only ever used

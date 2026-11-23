@@ -23,7 +23,7 @@ export class OnlineMenuService {
   ) {}
 
   /** Builds the payload the website's TiffinDataModel expects. */
-  async getTiffinData() {
+  async getTiffinData(imageBaseUrl?: string) {
     const [categories, items, branches, config] = await Promise.all([
       this.menuService.findAllCategories(),
       this.menuService.findAllItems(),
@@ -53,7 +53,7 @@ export class OnlineMenuService {
         isOnlineOrderOTP: false,
       },
       branches: branches.map((b) => toBranch(b, COMPANY_ID)),
-      foodItems: items.map(toFoodItem),
+      foodItems: items.map((i) => toFoodItem(i, imageBaseUrl)),
       foodCategories: categories.map(toFoodCategory),
       tables: [],
     };
