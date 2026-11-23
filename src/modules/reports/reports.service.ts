@@ -255,9 +255,21 @@ export interface SalesSummary {
   platformChargeTotal: number;
   deliveryChargeTotal: number;
   discountsTotal: number;
+  // Money received per payment method (Due orders listed separately).
+  byPayment: Array<{ label: string; orders: number; amount: number }>;
 }
 
-const SUMMARY_LABELS: Array<[keyof SalesSummary, string]> = [
+const PAYMENT_LABELS: Record<string, string> = {
+  CASH: 'Cash',
+  BKASH: 'bKash',
+  NAGAD: 'Nagad',
+  ROCKET: 'Rocket',
+  CARD: 'Card',
+  BANK: 'Bank transfer',
+  OTHER: 'Other',
+};
+
+const SUMMARY_LABELS: Array<[Exclude<keyof SalesSummary, 'byPayment'>, string]> = [
   ['totalOrders', 'Total Orders'],
   ['grossSales', 'Gross Sales'],
   ['subTotal', 'Sub Total'],
@@ -276,8 +288,19 @@ function computeSalesSummary(orders: Order[]): SalesSummary {
     platformChargeTotal: 0,
     deliveryChargeTotal: 0,
     discountsTotal: 0,
+    byPayment: [],
   };
+  const pay = new Map<string, { orders: number; amount: number }>();
   for (const o of orders) {
+    const key =
+      o.paymentStatus === 'DUE'
+        ? 'Due (unpaid)'
+        : ((o.paymentMethod && PAYMENT_LABELS[o.paymentMethod]) ??
+          'Not recorded');
+    const e = pay.get(key) ?? { orders: 0, amount: 0 };
+    e.orders += 1;
+    e.amount += Number(o.totalAmount);
+    pay.set(key, e);
     summary.totalOrders += 1;
     summary.grossSales += Number(o.totalAmount);
     summary.subTotal += Number(o.productSubtotal ?? 0);
@@ -286,6 +309,10 @@ function computeSalesSummary(orders: Order[]): SalesSummary {
     summary.deliveryChargeTotal += Number(o.deliveryCharge ?? 0);
     summary.discountsTotal += Number(o.discountAmount ?? 0);
   }
+  const order = [...Object.values(PAYMENT_LABELS), 'Not recorded', 'Due (unpaid)'];
+  summary.byPayment = order
+    .filter((l) => pay.has(l))
+    .map((l) => ({ label: l, orders: pay.get(l)!.orders, amount: pay.get(l)!.amount }));
   return summary;
 }
 
@@ -533,6 +560,13 @@ export class ReportsService {
     }
     sheet.addRow([]);
 
+    sheet.addRow(['Payment Method Totals']).font = { bold: true };
+    for (const p of summary.byPayment) {
+      const row = sheet.addRow([p.label, Number(p.amount.toFixed(2)), `${p.orders} order${p.orders === 1 ? '' : 's'}`]);
+      row.getCell(2).numFmt = MONEY_FORMAT;
+    }
+    sheet.addRow([]);
+
     const headerRow = sheet.addRow(xlsxColumns.map((c) => c.label));
     headerRow.font = { bold: true };
     sheet.views = [{ state: 'frozen', ySplit: headerRow.number }];
@@ -693,6 +727,18 @@ export class ReportsService {
     });
     const tileRows = Math.ceil(summaryItems.length / TILE_COLS);
     doc.y = tilesTop + tileRows * (TILE_HEIGHT + TILE_GAP) + 10;
+
+    // ── Payment Method Totals ──
+    drawSectionTitle(doc, 'Payment Method Totals', 'Amount received per payment method');
+    drawTable(
+      doc,
+      [
+        { label: 'Payment Method', width: 220 },
+        { label: 'Orders', width: 110, align: 'right' },
+        { label: 'Amount (BDT)', width: 160, align: 'right' },
+      ],
+      summary.byPayment.map((p) => [p.label, String(p.orders), p.amount.toFixed(2)]),
+    );
 
     // ── Orders by Platform ──
     drawSectionTitle(doc, 'Orders by Platform', 'Order source breakdown');
