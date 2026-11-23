@@ -35,6 +35,7 @@ import { PlatformMenuItem } from './modules/platform-menu/entities/platform-menu
 import { MenuItemImage } from './modules/menu/entities/menu-item-image.entity';
 import { PlatformMenuModule } from './modules/platform-menu/platform-menu.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { MenuImportModule } from './modules/menu-import/menu-import.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { UsersModule } from './modules/users/users.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
@@ -90,6 +91,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     MenuModule,
     PlatformMenuModule,
     CustomersModule,
+    MenuImportModule,
     OrdersModule,
     UsersModule,
     DevicesModule,
