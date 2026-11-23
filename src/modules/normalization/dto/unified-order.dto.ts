@@ -11,6 +11,8 @@ export enum OrderSource {
   PHONE = 'PHONE',
   OTHER = 'OTHER',
   PHYSICAL_STORE = 'PHYSICAL_STORE',
+  TIFFIN_TAKEAWAY = 'TIFFIN_TAKEAWAY',
+  STAFF = 'STAFF',
 }
 
 // Sources eligible for Manual Order Entry.
@@ -23,6 +25,8 @@ export const MANUAL_ORDER_SOURCES = [
   OrderSource.FOODIE,
   OrderSource.OTHER,
   OrderSource.PHYSICAL_STORE,
+  OrderSource.TIFFIN_TAKEAWAY,
+  OrderSource.STAFF,
 ] as const;
 
 export enum OrderType {
