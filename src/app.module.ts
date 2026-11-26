@@ -35,9 +35,12 @@ import { IngestModule } from './modules/ingest/ingest.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { PlatformMenuItem } from './modules/platform-menu/entities/platform-menu-item.entity';
 import { MenuItemImage } from './modules/menu/entities/menu-item-image.entity';
+import { HeroSlide } from './modules/cms/entities/hero-slide.entity';
+import { SiteVideo } from './modules/cms/entities/site-video.entity';
 import { PlatformMenuModule } from './modules/platform-menu/platform-menu.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { MenuImportModule } from './modules/menu-import/menu-import.module';
+import { CmsModule } from './modules/cms/cms.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { UsersModule } from './modules/users/users.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
@@ -79,6 +82,8 @@ import { ReportsModule } from './modules/reports/reports.module';
           AuditLog,
           PlatformMenuItem,
           MenuItemImage,
+          HeroSlide,
+          SiteVideo,
         ],
         // Always off — including local/test. Schema changes must go through
         // committed migrations (see ADR-008) so drift shows up in dev, not
@@ -96,6 +101,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     PlatformMenuModule,
     CustomersModule,
     MenuImportModule,
+    CmsModule,
     OrdersModule,
     UsersModule,
     DevicesModule,
