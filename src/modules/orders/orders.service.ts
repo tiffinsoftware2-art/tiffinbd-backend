@@ -243,6 +243,9 @@ export class OrdersService {
     }
     const branch = await this.branchRepo.findOneBy({ id: branchId });
     if (!branch) throw new NotFoundException(`Branch ${branchId} not found`);
+    if (!branch.is_active) {
+      throw new BadRequestException(`Branch ${branch.name} is inactive. Choose an active branch.`);
+    }
 
     const productSubtotal = dto.items.reduce(
       (sum, i) => sum + i.price * i.quantity,
