@@ -25,6 +25,8 @@ export enum OrderStatus {
 export enum PaymentStatus {
   PAID = 'PAID',
   DUE = 'DUE',
+  // Not chosen yet: picked when the order is completed or settled.
+  PENDING = 'PENDING',
 }
 
 // How a paid order was paid. Null for Due orders and for orders from before this existed.
@@ -117,7 +119,7 @@ export class Order {
   @Column({ type: 'boolean', default: false })
   isUpdated: boolean;
 
-  @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PAID })
+  @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
   paymentStatus: PaymentStatus;
 
   @Column({ type: 'enum', enum: PaymentMethod, nullable: true, default: null })
@@ -127,6 +129,12 @@ export class Order {
   // order, typed in by staff. Null for every other source.
   @Column({ type: 'varchar', length: 100, nullable: true, default: null })
   platformOrderId: string | null;
+
+  // The customer's phone in the standard form (common/utils/phone.ts): the key
+  // that links an order to its customer. Null when no phone was given.
+  @Index('IDX_orders_customerPhone')
+  @Column({ type: 'varchar', length: 20, nullable: true, default: null })
+  customerPhone: string | null;
 
   // ── Order Delete — soft-archive (null = active/not archived) — see order-delete.md / ADR-007 ──
   @Column({ type: 'datetime', precision: 3, nullable: true, default: null })

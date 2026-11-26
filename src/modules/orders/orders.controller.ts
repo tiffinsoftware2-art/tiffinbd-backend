@@ -20,7 +20,8 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import type { JwtPayload } from '../auth/auth.service';
 import { CreateManualOrderDto } from './dto/create-manual-order.dto';
 import { UpdateManualOrderDto } from './dto/update-manual-order.dto';
-import { UpdatePaymentStatusDto } from './dto/update-payment-status.dto';
+import { OptionalPaymentDto, RecordPaymentDto } from './dto/payment.dto';
+import { PaymentChangeService } from './payment-change.service';
 import { OrderExportFilterDto, OrderFilterDto } from './dto/order-filter.dto';
 import { SettleOrderDto } from './dto/settle-order.dto';
 import {
@@ -35,7 +36,10 @@ import { Audit } from '../audit/audit.decorator';
 @Controller('api/v1/orders')
 @Roles(UserRole.STAFF)
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly payments: PaymentChangeService,
+  ) {}
 
   @Get()
   findAll(@Query() filters: OrderFilterDto, @CurrentUser() actor: JwtPayload) {
@@ -98,17 +102,18 @@ export class OrdersController {
     return this.ordersService.updateManualOrder(id, dto, actor);
   }
 
-  // Admin+ — mark an order Paid or Due (used from the Customers page).
+  // Record an order's payment (Paid + method, or Due). Anyone working the
+  // order can do it once while it is Pending; after that Admin+ only (others
+  // send a payment change request). See payment-change.service.ts.
   @Audit('ORDER_PAYMENT_UPDATE', 'order')
   @Patch(':id/payment')
-  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  updatePayment(@Param('id') id: string, @Body() dto: UpdatePaymentStatusDto) {
-    return this.ordersService.updatePaymentStatus(
-      id,
-      dto.paymentStatus,
-      dto.paymentMethod,
-    );
+  updatePayment(
+    @Param('id') id: string,
+    @Body() dto: RecordPaymentDto,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    return this.payments.recordPayment(id, dto, actor);
   }
 
   @Audit('ORDER_ACCEPT', 'order')
@@ -136,7 +141,7 @@ export class OrdersController {
     @Body() dto: SettleOrderDto,
     @CurrentUser() actor: JwtPayload,
   ) {
-    return this.ordersService.settleOrder(id, dto.actionTaken, actor);
+    return this.ordersService.settleOrder(id, dto.actionTaken, actor, dto);
   }
 
   // Order Completion — see order-completion.md / ADR-011. No @Roles override
@@ -145,8 +150,12 @@ export class OrdersController {
   @Audit('ORDER_COMPLETE', 'order')
   @Patch(':id/complete')
   @HttpCode(HttpStatus.OK)
-  complete(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
-    return this.ordersService.completeOrder(id, actor);
+  complete(
+    @Param('id') id: string,
+    @CurrentUser() actor: JwtPayload,
+    @Body() dto: OptionalPaymentDto = {},
+  ) {
+    return this.ordersService.completeOrder(id, actor, dto);
   }
 
   // Order Delete — see order-delete.md / ADR-007.

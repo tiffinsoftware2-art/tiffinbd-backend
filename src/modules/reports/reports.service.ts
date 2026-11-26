@@ -256,8 +256,12 @@ export interface SalesSummary {
   deliveryChargeTotal: number;
   discountsTotal: number;
   // Money received per payment method (Due orders listed separately).
-  byPayment: Array<{ label: string; orders: number; amount: number }>;
+  byPayment: PaymentLine[];
+  // The same breakdown for each outlet (branch), sorted by outlet name.
+  byOutlet: Array<{ outlet: string; orders: number; amount: number; payments: PaymentLine[] }>;
 }
+
+type PaymentLine = { label: string; orders: number; amount: number };
 
 const PAYMENT_LABELS: Record<string, string> = {
   CASH: 'Cash',
@@ -269,7 +273,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   OTHER: 'Other',
 };
 
-const SUMMARY_LABELS: Array<[Exclude<keyof SalesSummary, 'byPayment'>, string]> = [
+const SUMMARY_LABELS: Array<[Exclude<keyof SalesSummary, 'byPayment' | 'byOutlet'>, string]> = [
   ['totalOrders', 'Total Orders'],
   ['grossSales', 'Gross Sales'],
   ['subTotal', 'Sub Total'],
@@ -279,7 +283,31 @@ const SUMMARY_LABELS: Array<[Exclude<keyof SalesSummary, 'byPayment'>, string]> 
   ['discountsTotal', 'Discounts'],
 ];
 
-function computeSalesSummary(orders: Order[]): SalesSummary {
+function paymentLabel(o: Order): string {
+  if (o.paymentStatus === 'DUE') return 'Due (unpaid)';
+  if (o.paymentStatus === 'PENDING') return 'Payment pending';
+  return (o.paymentMethod && PAYMENT_LABELS[o.paymentMethod]) ?? 'Not recorded';
+}
+
+const PAYMENT_ORDER = [...Object.values(PAYMENT_LABELS), 'Not recorded', 'Payment pending', 'Due (unpaid)'];
+
+// Orders and money per payment method, in a fixed order (Due last).
+function paymentBreakdown(orders: Order[]): PaymentLine[] {
+  const pay = new Map<string, { orders: number; amount: number }>();
+  for (const o of orders) {
+    const key = paymentLabel(o);
+    const e = pay.get(key) ?? { orders: 0, amount: 0 };
+    e.orders += 1;
+    e.amount += Number(o.totalAmount);
+    pay.set(key, e);
+  }
+  return PAYMENT_ORDER.filter((l) => pay.has(l)).map((l) => ({ label: l, ...pay.get(l)! }));
+}
+
+function computeSalesSummary(
+  orders: Order[],
+  branchNameById: Map<string, string> = new Map(),
+): SalesSummary {
   const summary: SalesSummary = {
     totalOrders: 0,
     grossSales: 0,
@@ -288,19 +316,11 @@ function computeSalesSummary(orders: Order[]): SalesSummary {
     platformChargeTotal: 0,
     deliveryChargeTotal: 0,
     discountsTotal: 0,
-    byPayment: [],
+    byPayment: paymentBreakdown(orders),
+    byOutlet: [],
   };
-  const pay = new Map<string, { orders: number; amount: number }>();
+  const byOutlet = new Map<string, Order[]>();
   for (const o of orders) {
-    const key =
-      o.paymentStatus === 'DUE'
-        ? 'Due (unpaid)'
-        : ((o.paymentMethod && PAYMENT_LABELS[o.paymentMethod]) ??
-          'Not recorded');
-    const e = pay.get(key) ?? { orders: 0, amount: 0 };
-    e.orders += 1;
-    e.amount += Number(o.totalAmount);
-    pay.set(key, e);
     summary.totalOrders += 1;
     summary.grossSales += Number(o.totalAmount);
     summary.subTotal += Number(o.productSubtotal ?? 0);
@@ -308,11 +328,17 @@ function computeSalesSummary(orders: Order[]): SalesSummary {
     summary.platformChargeTotal += Number(o.platformFee ?? 0);
     summary.deliveryChargeTotal += Number(o.deliveryCharge ?? 0);
     summary.discountsTotal += Number(o.discountAmount ?? 0);
+    const outlet = (o.branchId && branchNameById.get(o.branchId)) || 'Unassigned';
+    byOutlet.set(outlet, [...(byOutlet.get(outlet) ?? []), o]);
   }
-  const order = [...Object.values(PAYMENT_LABELS), 'Not recorded', 'Due (unpaid)'];
-  summary.byPayment = order
-    .filter((l) => pay.has(l))
-    .map((l) => ({ label: l, orders: pay.get(l)!.orders, amount: pay.get(l)!.amount }));
+  summary.byOutlet = [...byOutlet.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([outlet, list]) => ({
+      outlet,
+      orders: list.length,
+      amount: list.reduce((t, o) => t + Number(o.totalAmount), 0),
+      payments: paymentBreakdown(list),
+    }));
   return summary;
 }
 
@@ -498,7 +524,7 @@ export class ReportsService {
             (request?.reviewedBy && nameById.get(request.reviewedBy)) || '—',
         };
       }),
-      summary: computeSalesSummary(orders),
+      summary: computeSalesSummary(orders, branchNameById),
     };
   }
 
@@ -564,6 +590,21 @@ export class ReportsService {
     for (const p of summary.byPayment) {
       const row = sheet.addRow([p.label, Number(p.amount.toFixed(2)), `${p.orders} order${p.orders === 1 ? '' : 's'}`]);
       row.getCell(2).numFmt = MONEY_FORMAT;
+    }
+    sheet.addRow([]);
+
+    // Outlet-wise payments: one block per outlet, each payment method with
+    // its order count and amount, then the outlet total.
+    sheet.addRow(['Outlet-wise Payments']).font = { bold: true };
+    sheet.addRow(['Outlet', 'Payment Method', 'Orders', 'Amount']).font = { bold: true };
+    for (const o of summary.byOutlet) {
+      for (const p of o.payments) {
+        const row = sheet.addRow([o.outlet, p.label, p.orders, Number(p.amount.toFixed(2))]);
+        row.getCell(4).numFmt = MONEY_FORMAT;
+      }
+      const total = sheet.addRow([o.outlet, 'Outlet total', o.orders, Number(o.amount.toFixed(2))]);
+      total.font = { bold: true };
+      total.getCell(4).numFmt = MONEY_FORMAT;
     }
     sheet.addRow([]);
 
@@ -738,6 +779,22 @@ export class ReportsService {
         { label: 'Amount (BDT)', width: 160, align: 'right' },
       ],
       summary.byPayment.map((p) => [p.label, String(p.orders), p.amount.toFixed(2)]),
+    );
+
+    // ── Outlet-wise Payments ──
+    drawSectionTitle(doc, 'Outlet-wise Payments', 'Orders and amount per payment method, for each outlet');
+    drawTable(
+      doc,
+      [
+        { label: 'Outlet', width: 150 },
+        { label: 'Payment Method', width: 140 },
+        { label: 'Orders', width: 80, align: 'right' },
+        { label: 'Amount (BDT)', width: 120, align: 'right' },
+      ],
+      summary.byOutlet.flatMap((o) => [
+        ...o.payments.map((p, i) => [i === 0 ? o.outlet : '', p.label, String(p.orders), p.amount.toFixed(2)]),
+        ['', 'Outlet total', String(o.orders), o.amount.toFixed(2)],
+      ]),
     );
 
     // ── Orders by Platform ──

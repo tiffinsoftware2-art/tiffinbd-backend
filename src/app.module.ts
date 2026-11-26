@@ -16,6 +16,8 @@ import { Order } from './modules/orders/entities/order.entity';
 import { OrderHistory } from './modules/orders/entities/order-history.entity';
 import { OrderEditHistory } from './modules/orders/entities/order-edit-history.entity';
 import { OrderDeleteRequest } from './modules/orders/entities/order-delete-request.entity';
+import { PaymentChangeRequest } from './modules/orders/entities/payment-change-request.entity';
+import { Customer } from './modules/customers/entities/customer.entity';
 import { OrderCompletion } from './modules/orders/entities/order-completion.entity';
 import { Device } from './modules/devices/entities/device.entity';
 import { EscalationConfig } from './modules/settings/entities/escalation-config.entity';
@@ -68,6 +70,8 @@ import { ReportsModule } from './modules/reports/reports.module';
           OrderHistory,
           OrderEditHistory,
           OrderDeleteRequest,
+          PaymentChangeRequest,
+          Customer,
           OrderCompletion,
           Device,
           EscalationConfig,

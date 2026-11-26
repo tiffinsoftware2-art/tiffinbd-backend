@@ -12,6 +12,9 @@ import { In, Repository } from 'typeorm';
 import ExcelJS from 'exceljs';
 import { dhakaShifted } from '../../common/utils/dhaka-time';
 import type { UnifiedOrderDto } from '../normalization/dto/unified-order.dto';
+import { OrderSource } from '../normalization/dto/unified-order.dto';
+import type { OptionalPaymentDto } from './dto/payment.dto';
+import { isAdminRole } from './payment-change.service';
 import type { JwtPayload } from '../auth/auth.service';
 import type {
   OrderExportFilterDto,
@@ -119,6 +122,16 @@ const EXPORT_COLUMNS: Array<{
     width: 14,
     numFmt: MONEY_FORMAT,
     value: (o) => Number(o.totalAmount),
+  },
+  {
+    header: 'Payment',
+    width: 16,
+    value: (o) =>
+      o.paymentStatus === 'PENDING'
+        ? 'Pending'
+        : o.paymentStatus === 'DUE'
+          ? 'Due'
+          : `Paid${o.paymentMethod ? ' (' + o.paymentMethod + ')' : ''}`,
   },
   { header: 'Created By', width: 20, value: (o) => o.createdByName ?? '' },
   { header: 'Accepted By', width: 20, value: (o) => o.acceptedByName ?? '' },
@@ -296,8 +309,10 @@ export class OrdersService {
         totalAmount,
       },
       actor.sub,
-      dto.paymentStatus ?? PaymentStatus.PAID,
-      dto.paymentMethod ?? null,
+      // Payment is chosen when the order is completed or settled. Only
+      // Admin / Super Admin may record it while creating the order.
+      isAdminRole(actor.role) && dto.paymentStatus ? dto.paymentStatus : PaymentStatus.PENDING,
+      isAdminRole(actor.role) ? (dto.paymentMethod ?? null) : null,
       platformOrderId,
     );
     await this.repo.enrichCreators([order]);
@@ -313,6 +328,12 @@ export class OrdersService {
     dto: UpdateManualOrderDto,
     actor: JwtPayload,
   ): Promise<Order> {
+    // The payment is not edited here except by Admin / Super Admin; others
+    // record it when completing or ask through a payment change request.
+    if (!isAdminRole(actor.role)) {
+      delete dto.paymentStatus;
+      delete dto.paymentMethod;
+    }
     const order = await this.repo.findById(id);
     if (!order) throw new NotFoundException('Order not found');
     // Order Completion — a completed order is frozen; see ADR-011.
@@ -462,6 +483,11 @@ export class OrdersService {
 
     this.gateway.emit('order.created', socketPayload, order.branchId);
 
+    // Only website orders ring the phones (push alert + escalation timer), and
+    // only the order's own branch gets it. Orders staff enter by hand already
+    // have someone looking at them, so they skip the alert.
+    if (order.source !== OrderSource.WEBSITE) return;
+
     // Simplified payload for notification service (escalation timer only needs orderId + branchId)
     void this.events.publish('order.created', {
       orderId: order.id,
@@ -487,6 +513,19 @@ export class OrdersService {
         `${source} order ${platformOrderId} is already entered (order ${existing.externalId}).`,
       );
     }
+  }
+
+  // The payment chosen while completing/settling. Recorded only while still
+  // Pending (Admin+ may also overwrite); otherwise left alone, since a change
+  // after that goes through a payment change request.
+  private async applyPaymentIfAllowed(
+    order: Order,
+    payment: OptionalPaymentDto,
+    actor: JwtPayload,
+  ): Promise<void> {
+    if (!payment.paymentStatus) return;
+    if (order.paymentStatus !== PaymentStatus.PENDING && !isAdminRole(actor.role)) return;
+    await this.repo.setPaymentStatus(order, payment.paymentStatus, payment.paymentMethod);
   }
 
   // Admin+ — records whether an order is paid or still due.
@@ -550,6 +589,7 @@ export class OrdersService {
     id: string,
     actionTaken: string,
     actor: JwtPayload,
+    payment: OptionalPaymentDto = {},
   ): Promise<Order> {
     const order = await this.repo.findById(id);
     if (!order) throw new NotFoundException('Order not found');
@@ -565,6 +605,7 @@ export class OrdersService {
     if (order.settledAt) {
       throw new ConflictException('Order has already been settled');
     }
+    await this.applyPaymentIfAllowed(order, payment, actor);
     const saved = await this.repo.settle(order, actor.sub, actionTaken);
     this.gateway.emit(
       'order.settled',
@@ -584,7 +625,11 @@ export class OrdersService {
   // branch-scoped role, same shape as acceptOrder/createDeleteRequest). Only
   // ACCEPTED/ESCALATED orders are completable; `orders.status` is never
   // touched — see ADR-011 / order-completion.md.
-  async completeOrder(id: string, actor: JwtPayload): Promise<Order> {
+  async completeOrder(
+    id: string,
+    actor: JwtPayload,
+    payment: OptionalPaymentDto = {},
+  ): Promise<Order> {
     const order = await this.repo.findById(id);
     if (!order) throw new NotFoundException('Order not found');
     if (
@@ -613,6 +658,7 @@ export class OrdersService {
         'Only accepted or escalated orders can be marked completed',
       );
     }
+    await this.applyPaymentIfAllowed(order, payment, actor);
     const completion = await this.repo.completeOrder(
       order,
       actor.sub,
@@ -754,7 +800,17 @@ export class OrdersService {
       editHistory,
       deleteRequests,
     );
-    return Object.assign(order, { history, editHistory, deleteRequests });
+    // Branch contact details for the customer bill header.
+    const branch = order.branchId
+      ? await this.branchRepo.findOne({ where: { id: order.branchId } })
+      : null;
+    return Object.assign(order, {
+      history,
+      editHistory,
+      deleteRequests,
+      branchAddress: branch?.address ?? null,
+      branchPhone: branch?.phone ?? null,
+    });
   }
 
   // Order Delete — direct archive. ADMIN/SUPER_ADMIN only (enforced by the

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { normalizePhone } from '../../common/utils/phone';
 import { Order, PaymentStatus } from '../orders/entities/order.entity';
 import { CustomerFilterDto } from './dto/customer-filter.dto';
-
-const PHONE_SQL = "TRIM(JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.phone')))";
+import { Customer } from './entities/customer.entity';
 
 export interface CustomerRow {
   phone: string;
@@ -18,40 +18,60 @@ export interface CustomerRow {
   lastOrderAt: string;
 }
 
-// Customers are not stored as their own records: they are derived from orders,
-// grouped by phone number. Orders with no phone (common for Foodpanda, Pathao,
-// Foodi and Physical Store orders) have no identity, so they are not listed.
-// Archived (deleted) orders are ignored.
+// One row per customer, keyed by phone number in the standard form
+// (common/utils/phone.ts), so "+8801712…" and "01712…" are the same person.
+// Name and address come from the customers table (latest values given);
+// order counts and money come from that customer's orders. Orders with no
+// phone (common for Foodpanda, Pathao, Foodi) have no customer. Archived
+// (deleted) orders are ignored.
 @Injectable()
 export class CustomersService {
-  constructor(@InjectRepository(Order) private readonly orders: Repository<Order>) {}
+  constructor(
+    @InjectRepository(Order) private readonly orders: Repository<Order>,
+    @InjectRepository(Customer)
+    private readonly customers: Repository<Customer>,
+  ) {}
 
-  async list(filters: CustomerFilterDto): Promise<{ data: CustomerRow[]; total: number }> {
+  async list(
+    filters: CustomerFilterDto,
+  ): Promise<{ data: CustomerRow[]; total: number }> {
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 20;
 
     const qb = this.orders
       .createQueryBuilder('o')
+      .leftJoin(Customer, 'c', 'c.phone = o.customerPhone')
       .where('o.archivedAt IS NULL')
-      .andWhere(`${PHONE_SQL} IS NOT NULL`)
-      .andWhere(`${PHONE_SQL} <> ''`);
-    if (filters.source) qb.andWhere('o.source = :source', { source: filters.source });
+      .andWhere('o.customerPhone IS NOT NULL')
+      .andWhere("o.customerPhone <> ''");
+    if (filters.source)
+      qb.andWhere('o.source = :source', { source: filters.source });
     if (filters.search?.trim()) {
+      const q = filters.search.trim();
+      const digits = normalizePhone(q);
       qb.andWhere(
-        `(${PHONE_SQL} LIKE :q OR JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.name')) LIKE :q)`,
-        { q: `%${filters.search.trim()}%` },
+        digits
+          ? '(o.customerPhone LIKE :p OR c.name LIKE :q)'
+          : 'c.name LIKE :q',
+        { q: `%${q}%`, p: `%${digits}%` },
       );
     }
 
-    qb.select(PHONE_SQL, 'phone')
+    qb.select('o.customerPhone', 'phone')
       .addSelect('COUNT(*)', 'orderCount')
       .addSelect('SUM(o.totalAmount)', 'totalAmount')
-      .addSelect('SUM(CASE WHEN o.paymentStatus = :due THEN o.totalAmount ELSE 0 END)', 'dueAmount')
-      .addSelect('SUM(CASE WHEN o.paymentStatus = :due THEN 1 ELSE 0 END)', 'dueOrders')
+      .addSelect(
+        'SUM(CASE WHEN o.paymentStatus = :due THEN o.totalAmount ELSE 0 END)',
+        'dueAmount',
+      )
+      .addSelect(
+        'SUM(CASE WHEN o.paymentStatus = :due THEN 1 ELSE 0 END)',
+        'dueOrders',
+      )
       .addSelect('MAX(o.createdAt)', 'lastOrderAt')
       .addSelect('GROUP_CONCAT(DISTINCT o.source)', 'platforms')
       .setParameter('due', PaymentStatus.DUE)
-      .groupBy(PHONE_SQL);
+      .groupBy('o.customerPhone');
     if (filters.dueOnly === 'true') qb.having('dueOrders > 0');
 
     const all = await qb.orderBy('lastOrderAt', 'DESC').getRawMany<{
@@ -68,23 +88,15 @@ export class CustomersService {
     const slice = all.slice((page - 1) * limit, page * limit);
     if (slice.length === 0) return { data: [], total };
 
-    // Name and address come from each customer's most recent order.
-    const latest = await this.orders
-      .createQueryBuilder('o')
-      .select(PHONE_SQL, 'phone')
-      .addSelect("JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.name'))", 'name')
-      .addSelect("JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.address'))", 'address')
-      .where('o.archivedAt IS NULL')
-      .andWhere(`${PHONE_SQL} IN (:...phones)`, { phones: slice.map((r) => r.phone) })
-      .orderBy('o.createdAt', 'DESC')
-      .getRawMany<{ phone: string; name: string | null; address: string | null }>();
-    const latestByPhone = new Map<string, { name: string | null; address: string | null }>();
-    for (const r of latest) if (!latestByPhone.has(r.phone)) latestByPhone.set(r.phone, r);
+    const saved = await this.customers.find({
+      where: { phone: In(slice.map((r) => r.phone)) },
+    });
+    const byPhone = new Map(saved.map((c) => [c.phone, c]));
 
     const data: CustomerRow[] = slice.map((r) => ({
       phone: r.phone,
-      name: latestByPhone.get(r.phone)?.name ?? '',
-      address: latestByPhone.get(r.phone)?.address ?? '',
+      name: byPhone.get(r.phone)?.name ?? '',
+      address: byPhone.get(r.phone)?.address ?? '',
       orderCount: Number(r.orderCount),
       totalAmount: Number(r.totalAmount),
       dueAmount: Number(r.dueAmount),
@@ -99,7 +111,7 @@ export class CustomersService {
     const rows = await this.orders
       .createQueryBuilder('o')
       .where('o.archivedAt IS NULL')
-      .andWhere(`${PHONE_SQL} = :phone`, { phone: phone.trim() })
+      .andWhere('o.customerPhone = :phone', { phone: normalizePhone(phone) })
       .orderBy('o.createdAt', 'DESC')
       .getMany();
     return rows.map((o) => ({
@@ -111,5 +123,27 @@ export class CustomersService {
       paymentStatus: o.paymentStatus,
       paymentMethod: o.paymentMethod,
     }));
+  }
+
+  // For the order form: the saved details for this phone number, or null.
+  async lookup(phone: string): Promise<{
+    phone: string;
+    name: string;
+    address: string;
+    orderCount: number;
+  } | null> {
+    const key = normalizePhone(phone);
+    if (!key) return null;
+    const c = await this.customers.findOne({ where: { phone: key } });
+    if (!c) return null;
+    const orderCount = await this.orders.count({
+      where: { customerPhone: key },
+    });
+    return {
+      phone: c.phone,
+      name: c.name,
+      address: c.address ?? '',
+      orderCount,
+    };
   }
 }

@@ -1,6 +1,8 @@
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { OptionalPaymentDto } from './payment.dto';
 
-export class SettleOrderDto {
+// May also carry the payment, chosen while settling.
+export class SettleOrderDto extends OptionalPaymentDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(1000)

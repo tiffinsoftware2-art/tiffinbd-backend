@@ -24,6 +24,8 @@ import {
   OrderDeleteRequest,
 } from './entities/order-delete-request.entity';
 import { OrderCompletion } from './entities/order-completion.entity';
+import { Customer } from '../customers/entities/customer.entity';
+import { normalizePhone } from '../../common/utils/phone';
 import { dhakaShiftExpr } from '../../common/utils/dhaka-time';
 import type { UnifiedOrderDto } from '../normalization/dto/unified-order.dto';
 import type {
@@ -63,7 +65,42 @@ export class OrdersRepository {
     private readonly menuItemRepo: Repository<MenuItem>,
     @InjectRepository(Branch) private readonly branchRepo: Repository<Branch>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(Customer)
+    private readonly customerRepo: Repository<Customer>,
   ) {}
+
+  // Saves the order's customer under their phone number (the unique key).
+  // Blank values never overwrite saved ones, and the placeholder names given
+  // to platform orders ("Foodpanda customer") are not saved as names.
+  async saveCustomer(
+    customer: { phone?: string; name?: string; address?: string } | null,
+  ): Promise<void> {
+    const phone = normalizePhone(customer?.phone);
+    if (!phone) return;
+    const rawName = (customer?.name ?? '').trim();
+    const name = / customer$/i.test(rawName) ? '' : rawName.slice(0, 255);
+    const address = (customer?.address ?? '').trim();
+    const existing = await this.customerRepo.findOne({ where: { phone } });
+    if (!existing) {
+      await this.customerRepo
+        .createQueryBuilder()
+        .insert()
+        .values({ phone, name, address: address || null })
+        .orIgnore()
+        .execute();
+      return;
+    }
+    const patch: Partial<Customer> = {};
+    if (name && name !== existing.name) patch.name = name;
+    if (address && address !== existing.address) patch.address = address;
+    if (Object.keys(patch).length)
+      await this.customerRepo.update({ id: existing.id }, patch);
+  }
+
+  async findCustomerByPhone(phone: string): Promise<Customer | null> {
+    const key = normalizePhone(phone);
+    return key ? this.customerRepo.findOne({ where: { phone: key } }) : null;
+  }
 
   // Resolves [item:id] placeholders to real names/prices using a single batch query.
   private async enrichItems(orders: Order[]): Promise<void> {
@@ -97,7 +134,7 @@ export class OrdersRepository {
     branchId: string | null,
     pricing?: ManualOrderPricing,
     createdBy: string | null = null,
-    paymentStatus: PaymentStatus = PaymentStatus.PAID,
+    paymentStatus: PaymentStatus = PaymentStatus.PENDING,
     paymentMethod: PaymentMethod | null = null,
     platformOrderId: string | null = null,
   ): Promise<Order> {
@@ -125,7 +162,8 @@ export class OrdersRepository {
       rawPayload: unified.rawPayload,
       createdBy,
       paymentStatus,
-      paymentMethod: paymentStatus === PaymentStatus.DUE ? null : paymentMethod,
+      paymentMethod:
+        paymentStatus === PaymentStatus.PAID ? paymentMethod : null,
       platformOrderId,
       acceptedBy: null,
       acceptedAt: null,
@@ -156,11 +194,19 @@ export class OrdersRepository {
       platformFee: pricing?.platformFee ?? unified.platformFee ?? 0,
       vatPercent: pricing?.vatPercent ?? unified.vatPercent ?? null,
       vatAmount: pricing?.vatAmount ?? unified.vatAmount ?? null,
-      discountType: pricing ? pricing.discountType : (unified.discountType ?? null),
-      discountValue: pricing ? pricing.discountValue : (unified.discountValue ?? 0),
-      discountAmount: pricing ? pricing.discountAmount : (unified.discountAmount ?? 0),
+      discountType: pricing
+        ? pricing.discountType
+        : (unified.discountType ?? null),
+      discountValue: pricing
+        ? pricing.discountValue
+        : (unified.discountValue ?? 0),
+      discountAmount: pricing
+        ? pricing.discountAmount
+        : (unified.discountAmount ?? 0),
+      customerPhone: normalizePhone(unified.customerInfo?.phone) || null,
     });
     const saved = await this.orderRepo.save(order);
+    await this.saveCustomer(saved.customer);
     await this.historyRepo.save(
       this.historyRepo.create({
         orderId: saved.id,
@@ -196,7 +242,9 @@ export class OrdersRepository {
   ): Promise<Order> {
     order.paymentStatus = status;
     order.paymentMethod =
-      status === PaymentStatus.DUE ? null : (method ?? order.paymentMethod ?? null);
+      status === PaymentStatus.PAID
+        ? (method ?? order.paymentMethod ?? null)
+        : null;
     return this.orderRepo.save(order);
   }
 
@@ -543,7 +591,9 @@ export class OrdersRepository {
   async enrichCreators(orders: Order[]): Promise<void> {
     const nameById = await this.resolveNames(orders.map((o) => o.createdBy));
     for (const o of orders) {
-      o.createdByName = o.createdBy ? (nameById.get(o.createdBy) ?? null) : null;
+      o.createdByName = o.createdBy
+        ? (nameById.get(o.createdBy) ?? null)
+        : null;
     }
   }
 
@@ -666,7 +716,11 @@ export class OrdersRepository {
     completedByRole: UserRole,
   ): Promise<OrderCompletion> {
     const completion = await this.completionRepo.save(
-      this.completionRepo.create({ orderId: order.id, completedBy, completedByRole }),
+      this.completionRepo.create({
+        orderId: order.id,
+        completedBy,
+        completedByRole,
+      }),
     );
     await this.historyRepo.save(
       this.historyRepo.create({
@@ -728,11 +782,16 @@ export class OrdersRepository {
     order.orderType = dto.orderType;
     order.customer = resolveManualCustomer(dto);
     order.items = dto.items;
-    order.platformOrderId = normalisePlatformOrderId(dto.source, dto.platformOrderId);
+    order.platformOrderId = normalisePlatformOrderId(
+      dto.source,
+      dto.platformOrderId,
+    );
     if (dto.paymentStatus) {
       order.paymentStatus = dto.paymentStatus;
       order.paymentMethod =
-        dto.paymentStatus === PaymentStatus.DUE ? null : (dto.paymentMethod ?? order.paymentMethod ?? null);
+        dto.paymentStatus === PaymentStatus.PAID
+          ? (dto.paymentMethod ?? order.paymentMethod ?? null)
+          : null;
     }
     order.productSubtotal = pricing.productSubtotal;
     order.vatPercent = pricing.vatPercent;
@@ -744,8 +803,10 @@ export class OrdersRepository {
     order.discountAmount = pricing.discountAmount;
     order.totalAmount = pricing.totalAmount;
     order.isUpdated = true;
+    order.customerPhone = normalizePhone(order.customer?.phone) || null;
 
     const saved = await this.orderRepo.save(order);
+    await this.saveCustomer(saved.customer);
 
     await this.editHistoryRepo.save(
       this.editHistoryRepo.create({

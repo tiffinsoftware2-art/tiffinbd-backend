@@ -10,6 +10,10 @@ import { OrderHistory } from './entities/order-history.entity';
 import { OrderEditHistory } from './entities/order-edit-history.entity';
 import { OrderDeleteRequest } from './entities/order-delete-request.entity';
 import { OrderCompletion } from './entities/order-completion.entity';
+import { PaymentChangeRequest } from './entities/payment-change-request.entity';
+import { Customer } from '../customers/entities/customer.entity';
+import { PaymentChangeController } from './payment-change.controller';
+import { PaymentChangeService } from './payment-change.service';
 import { OrdersController } from './orders.controller';
 import { OrdersGateway } from './orders.gateway';
 import { OrdersRepository } from './orders.repository';
@@ -23,6 +27,8 @@ import { OrdersService } from './orders.service';
       OrderEditHistory,
       OrderDeleteRequest,
       OrderCompletion,
+      PaymentChangeRequest,
+      Customer,
       MenuItem,
       Branch,
       User,
@@ -30,8 +36,8 @@ import { OrdersService } from './orders.service';
     AuthModule,
     SettingsModule,
   ],
-  controllers: [OrdersController],
-  providers: [OrdersService, OrdersRepository, OrdersGateway],
+  controllers: [OrdersController, PaymentChangeController],
+  providers: [OrdersService, OrdersRepository, OrdersGateway, PaymentChangeService],
   exports: [OrdersService],
 })
 export class OrdersModule {}
