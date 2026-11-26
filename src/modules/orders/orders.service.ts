@@ -86,6 +86,13 @@ const EXPORT_COLUMNS: Array<{
   { header: 'Customer', width: 24, value: (o) => o.customer?.name ?? '' },
   { header: 'Platform', width: 13, value: (o) => o.source },
   { header: 'Branch', width: 18, value: (o) => o.branchName ?? '' },
+  {
+    header: 'Items',
+    width: 50,
+    // One "qty x name" per line so the cell stays readable in Excel.
+    value: (o) =>
+      (o.items ?? []).map((i) => `${i.quantity}x ${i.name}`).join('\n'),
+  },
   { header: 'Status', width: 12, value: (o) => o.status },
   {
     header: 'Sub Total',
@@ -203,6 +210,7 @@ async function buildOrdersXlsx(
 
   for (const o of orders) {
     const row = sheet.addRow(EXPORT_COLUMNS.map((c) => c.value(o)));
+    row.alignment = { vertical: 'top', wrapText: true };
     EXPORT_COLUMNS.forEach((c, i) => {
       if (c.numFmt) row.getCell(i + 1).numFmt = c.numFmt;
     });
