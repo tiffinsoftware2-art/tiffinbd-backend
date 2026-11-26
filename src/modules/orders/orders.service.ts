@@ -1019,6 +1019,30 @@ export class OrdersService {
     );
   }
 
+  // Super Admin only (enforced by the controller): reverses Mark Completed,
+  // so the order can be worked on (and edited) again. The payment stays as
+  // recorded. Archived orders stay frozen.
+  async uncompleteOrder(id: string, actor: JwtPayload): Promise<Order> {
+    const order = await this.repo.findById(id);
+    if (!order) throw new NotFoundException('Order not found');
+    if (!order.isCompleted) {
+      throw new ConflictException('Order is not marked completed');
+    }
+    if (order.archivedAt) {
+      throw new ConflictException('Order is archived');
+    }
+    await this.repo.uncompleteOrder(order, actor.sub);
+    order.isCompleted = false;
+    order.completedAt = null;
+    order.completedBy = null;
+    this.gateway.emit(
+      'order.uncompleted',
+      { orderId: order.id, branchId: order.branchId },
+      order.branchId,
+    );
+    return order;
+  }
+
   private emitOrderCompleted(order: Order): void {
     this.gateway.emit(
       'order.completed',

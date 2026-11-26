@@ -158,6 +158,15 @@ export class OrdersController {
     return this.ordersService.completeOrder(id, actor, dto);
   }
 
+  // Super Admin only — puts a completed order back to not completed.
+  @Audit('ORDER_UNCOMPLETE', 'order')
+  @Patch(':id/uncomplete')
+  @Roles(UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  uncomplete(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
+    return this.ordersService.uncompleteOrder(id, actor);
+  }
+
   // Order Delete — see order-delete.md / ADR-007.
   //
   // Archive/unarchive and the request review path are MANAGER+ as of

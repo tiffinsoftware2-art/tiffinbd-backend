@@ -733,6 +733,19 @@ export class OrdersRepository {
     return completion;
   }
 
+  // Super Admin only: takes the "completed" mark off an order again.
+  async uncompleteOrder(order: Order, actorId: string): Promise<void> {
+    await this.completionRepo.delete({ orderId: order.id });
+    await this.historyRepo.save(
+      this.historyRepo.create({
+        orderId: order.id,
+        status: order.status,
+        changedBy: actorId,
+        note: 'Order marked not completed',
+      }),
+    );
+  }
+
   // Generic history write for actions that don't otherwise touch the Order
   // row itself (delete-request created/rejected) — see order-history.md.
   async logHistory(
