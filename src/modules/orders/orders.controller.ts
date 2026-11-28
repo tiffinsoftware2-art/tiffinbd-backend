@@ -49,7 +49,7 @@ export class OrdersController {
   // Order Delete review queue — MUST be declared before @Get(':id') below,
   // otherwise Nest/Express would match "delete-requests" as an :id value.
   @Get('delete-requests')
-  @Roles(UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   listDeleteRequests(@Query() filters: DeleteRequestFilterDto) {
     return this.ordersService.listDeleteRequests(filters.status);
   }
@@ -173,8 +173,10 @@ export class OrdersController {
   // approving a delete request — is ADMIN / SUPER_ADMIN only. Everyone else
   // (MANAGER and BUSINESS_HEAD included) can only ASK, via POST
   // :id/delete-requests, which any role may call. This moves the line back up
-  // from MANAGER (2026-07-15) to ADMIN, ADR-007's original split. Restoring
-  // (unarchive) and rejecting a request delete nothing, so they stay MANAGER+.
+  // from MANAGER (2026-07-15) to ADMIN, ADR-007's original split. Delete
+  // requests are also invisible to everyone but ADMIN+: the review queue list
+  // and approve/reject are all ADMIN. Restoring (unarchive) deletes nothing, so
+  // it stays MANAGER+.
   @Audit('ORDER_ARCHIVE', 'order')
   @Post(':id/archive')
   @Roles(UserRole.ADMIN)
@@ -219,7 +221,7 @@ export class OrdersController {
 
   @Audit('ORDER_DELETE_REJECT', 'order_delete_request')
   @Patch('delete-requests/:id/reject')
-  @Roles(UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   rejectDeleteRequest(
     @Param('id') id: string,
