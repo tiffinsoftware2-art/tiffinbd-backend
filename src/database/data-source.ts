@@ -20,6 +20,7 @@ import { Device } from '../modules/devices/entities/device.entity';
 import { EscalationConfig } from '../modules/settings/entities/escalation-config.entity';
 import { ManualOrderConfig } from '../modules/settings/entities/manual-order-config.entity';
 import { AuditLog } from '../modules/audit/entities/audit-log.entity';
+import { Addon } from '../modules/addons/entities/addon.entity';
 import { PlatformMenuItem } from '../modules/platform-menu/entities/platform-menu-item.entity';
 import { MenuItemImage } from '../modules/menu/entities/menu-item-image.entity';
 import { HeroSlide } from '../modules/cms/entities/hero-slide.entity';
@@ -63,6 +64,7 @@ export const AppDataSource = new DataSource({
     MenuItemImage,
     HeroSlide,
     SiteVideo,
+    Addon,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   // Always false, even in development — this DataSource is only ever used

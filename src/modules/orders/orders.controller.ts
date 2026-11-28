@@ -169,13 +169,15 @@ export class OrdersController {
 
   // Order Delete — see order-delete.md / ADR-007.
   //
-  // Archive/unarchive and the request review path are MANAGER+ as of
-  // 2026-07-15 (was ADMIN+). ADR-007's original "only Admin acts immediately,
-  // everyone else requests" split still holds — the line just moved down to
-  // MANAGER, so BRANCH_MANAGER/STAFF remain request-only.
+  // Anything that actually DELETES an order — archiving it directly, or
+  // approving a delete request — is ADMIN / SUPER_ADMIN only. Everyone else
+  // (MANAGER and BUSINESS_HEAD included) can only ASK, via POST
+  // :id/delete-requests, which any role may call. This moves the line back up
+  // from MANAGER (2026-07-15) to ADMIN, ADR-007's original split. Restoring
+  // (unarchive) and rejecting a request delete nothing, so they stay MANAGER+.
   @Audit('ORDER_ARCHIVE', 'order')
   @Post(':id/archive')
-  @Roles(UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   archive(
     @Param('id') id: string,
@@ -206,7 +208,7 @@ export class OrdersController {
 
   @Audit('ORDER_DELETE_APPROVE', 'order_delete_request')
   @Patch('delete-requests/:id/approve')
-  @Roles(UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   approveDeleteRequest(
     @Param('id') id: string,

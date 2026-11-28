@@ -28,6 +28,7 @@ import { Customer } from '../customers/entities/customer.entity';
 import { normalizePhone } from '../../common/utils/phone';
 import { dhakaShiftExpr } from '../../common/utils/dhaka-time';
 import type { UnifiedOrderDto } from '../normalization/dto/unified-order.dto';
+import type { OrderItemDto } from '../normalization/dto/order-item.dto';
 import type {
   OrderExportFilterDto,
   OrderFilterDto,
@@ -838,6 +839,74 @@ export class OrdersRepository {
     );
     await this.enrichBranches([saved]);
     return saved;
+  }
+
+  // The stored order exactly as saved — no enrichment. enrichItems() rewrites
+  // item names/prices from the live menu, which must not be written back when
+  // we only mean to append a line.
+  findByIdRaw(id: string): Promise<Order | null> {
+    return this.orderRepo.findOne({ where: { id } });
+  }
+
+  // Appends one item line and applies the new totals. Unlike updateManual() it
+  // touches nothing else — customer, source, existing lines, payment and the
+  // VAT/delivery/platform snapshots all stay as they were — so existing item
+  // lines (and what the mobile app reads from them) are unchanged. Records an
+  // edit-history snapshot and a status-history note, like any other edit.
+  async appendItem(
+    order: Order,
+    item: OrderItemDto,
+    pricing: {
+      productSubtotal: number;
+      vatAmount: number | null;
+      discountAmount: number | null;
+      totalAmount: number;
+    },
+    actorId: string,
+    note: string,
+  ): Promise<Order> {
+    const previousSnapshot: OrderEditSnapshot = {
+      source: order.source,
+      orderType: order.orderType,
+      customer: order.customer,
+      items: order.items,
+      productSubtotal: order.productSubtotal,
+      vatPercent: order.vatPercent,
+      vatAmount: order.vatAmount,
+      deliveryCharge: order.deliveryCharge,
+      platformFee: order.platformFee,
+      discountType: order.discountType,
+      discountValue: order.discountValue,
+      discountAmount: order.discountAmount,
+      totalAmount: order.totalAmount,
+    };
+
+    order.items = [...order.items, item];
+    order.productSubtotal = pricing.productSubtotal;
+    order.vatAmount = pricing.vatAmount;
+    order.discountAmount = pricing.discountAmount;
+    order.totalAmount = pricing.totalAmount;
+    order.isUpdated = true;
+
+    const saved = await this.orderRepo.save(order);
+
+    await this.editHistoryRepo.save(
+      this.editHistoryRepo.create({
+        orderId: saved.id,
+        editedBy: actorId,
+        previousSnapshot,
+      }),
+    );
+    await this.historyRepo.save(
+      this.historyRepo.create({
+        orderId: saved.id,
+        status: saved.status,
+        changedBy: actorId,
+        note,
+      }),
+    );
+    const fresh = await this.findById(saved.id);
+    return fresh ?? saved;
   }
 
   async findEditHistory(orderId: string): Promise<OrderEditHistory[]> {

@@ -14,6 +14,9 @@ import { PaymentChangeRequest } from './entities/payment-change-request.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { PaymentChangeController } from './payment-change.controller';
 import { PaymentChangeService } from './payment-change.service';
+import { AddonsModule } from '../addons/addons.module';
+import { OrderAddonsController } from './order-addons.controller';
+import { OrderAddonsService } from './order-addons.service';
 import { OrdersController } from './orders.controller';
 import { OrdersGateway } from './orders.gateway';
 import { OrdersRepository } from './orders.repository';
@@ -35,9 +38,10 @@ import { OrdersService } from './orders.service';
     ]),
     AuthModule,
     SettingsModule,
+    AddonsModule,
   ],
-  controllers: [OrdersController, PaymentChangeController],
-  providers: [OrdersService, OrdersRepository, OrdersGateway, PaymentChangeService],
+  controllers: [OrdersController, PaymentChangeController, OrderAddonsController],
+  providers: [OrdersService, OrdersRepository, OrdersGateway, PaymentChangeService, OrderAddonsService],
   exports: [OrdersService],
 })
 export class OrdersModule {}

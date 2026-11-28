@@ -33,6 +33,8 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { EventsModule } from './modules/events/events.module';
 import { IngestModule } from './modules/ingest/ingest.module';
 import { MenuModule } from './modules/menu/menu.module';
+import { Addon } from './modules/addons/entities/addon.entity';
+import { AddonsModule } from './modules/addons/addons.module';
 import { PlatformMenuItem } from './modules/platform-menu/entities/platform-menu-item.entity';
 import { MenuItemImage } from './modules/menu/entities/menu-item-image.entity';
 import { HeroSlide } from './modules/cms/entities/hero-slide.entity';
@@ -84,6 +86,7 @@ import { ReportsModule } from './modules/reports/reports.module';
           MenuItemImage,
           HeroSlide,
           SiteVideo,
+          Addon,
         ],
         // Always off — including local/test. Schema changes must go through
         // committed migrations (see ADR-008) so drift shows up in dev, not
@@ -98,6 +101,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     BranchesModule,
     IngestModule,
     MenuModule,
+    AddonsModule,
     PlatformMenuModule,
     CustomersModule,
     MenuImportModule,
